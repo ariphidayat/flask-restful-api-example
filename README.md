@@ -2,11 +2,11 @@
 
 ## Prerequisite
 
-Installed Python 3. Highly recommended to use `**pyenv**`, a wonderful tool for managing python version. For more detail: [https://github.com/pyenv/pyenv](https://github.com/pyenv/pyenv) 
+Installed Python 3. Highly recommended to use `pyenv`, a wonderful tool for managing python version. For more detail: [https://github.com/pyenv/pyenv](https://github.com/pyenv/pyenv) 
 
 ## Python Virtual Environment
 
-`**virtualenv**` is a python virtual environment where you can install packages and isolate them from all other Python packages. The basic commands:
+`virtualenv` is a python virtual environment where you can install packages and isolate them from all other Python packages. The basic commands:
 
 - `$ pip install virtualenv` install using pip
 - `$ virtualenv [directory name]` create virtual environment directory
@@ -38,8 +38,14 @@ $ python api.py
 ## APIs Call Example
 
 ```bash
-$ curl -X POST 'localhost:5000/users' -H 'Content-Type: application/json' \
+$ curl -X  POST 'localhost:5000/users' \
+-H 'x-access-token: [jwt token here]' \
+-H 'Content-Type: application/json' \
 -d '{"name":"arip", "password":"rahasia"}'
+```
+
+```bash
+$ curl -X GET -u arip:rahasia 'localhost:5000/login'
 ```
 
 ```bash
@@ -47,13 +53,13 @@ $ curl -X GET 'localhost:5000/users'
 ```
 
 ```bash
-$ curl -X GET 'localhost:5000/users/d0823dab-bc6d-4784-ba17-3d43f019c64b'
+$ curl -X GET 'localhost:5000/users/[public_id here]'
 ```
 
 ```bash
-$ curl -X PUT 'localhost:5000/users/d0823dab-bc6d-4784-ba17-3d43f019c64b'
+$ curl -X PUT 'localhost:5000/users/[public_id here]'
 ```
 
 ```bash
-$ curl -X DELETE 'localhost:5000/users/d0823dab-bc6d-4784-ba17-3d43f019c64b'
+$ curl -X DELETE 'localhost:5000/users/[public_id here]'
 ```

@@ -1,7 +1,10 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 import uuid
+import jwt
+import datetime
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 's3cr3tk3y'
@@ -22,8 +25,30 @@ class Todo(db.Model):
     complete = db.Column(db.Boolean)
     user_id = db.Column(db.Integer)
 
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+
+        if 'x-access-token' in request.headers:
+            token = request.headers['x-access-token']
+        
+        if not token:
+            return jsonify({'message' : 'Token is missing!'})
+        
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'])
+            current_user = User.query.filter_by(public_id=data['public_id']).first()
+        except:
+            return jsonify({'message' : 'Token is invalid!'}), 401
+        
+        return f(current_user, *args, **kwargs)
+    
+    return decorated
+
 @app.route('/users', methods=['GET'])
-def get_users():
+@token_required
+def get_users(current_user):
     users = User.query.all()
 
     output = []
@@ -38,7 +63,8 @@ def get_users():
     return jsonify({'users' : output})
 
 @app.route('/users/<public_id>', methods=['GET'])
-def get_user(public_id):
+@token_required
+def get_user(current_user, public_id):
     user = User.query.filter_by(public_id=public_id).first()
 
     if not user:
@@ -53,7 +79,8 @@ def get_user(public_id):
     return jsonify({'user' : user_data})
 
 @app.route('/users', methods=['POST'])
-def create_user():
+@token_required
+def create_user(current_user):
     data = request.get_json()
 
     hashed_password = generate_password_hash(data['password'], method='sha256')
@@ -64,7 +91,11 @@ def create_user():
     return jsonify({'message' : 'New user created!'})
 
 @app.route('/users/<public_id>', methods=['PUT'])
-def promote_user(public_id):
+@token_required
+def promote_user(current_user, public_id):
+    if not current_user.admin:
+        return jsonify({'message' : 'Cannot perform this function!'})
+
     user = User.query.filter_by(public_id=public_id).first()
 
     if not user:
@@ -76,7 +107,11 @@ def promote_user(public_id):
     return jsonify({'message' : 'User has been promoted!'})
 
 @app.route('/users/<public_id>', methods=['DELETE'])
-def delete_user(public_id):
+@token_required
+def delete_user(current_user, public_id):
+    if not current_user.admin:
+        return jsonify({'message' : 'Cannot perform this function!'})
+
     user = User.query.filter_by(public_id=public_id).first()
 
     if not user:
@@ -87,6 +122,24 @@ def delete_user(public_id):
 
     return jsonify({'message' : 'User has been deleted!'})
 
+@app.route('/login')
+def login():
+    auth = request.authorization
 
+    if not auth or not auth.username or not auth.password:
+        return make_response('Could not verify', 401, {'WWW-Authenticate' : 'Basic realm="Login required!"'})
+    
+    user = User.query.filter_by(name=auth.username).first()
+    
+    if not user:
+        return make_response('Could not verify', 401, {'WWW-Authenticate' : 'Basic realm="Login required!"'})
+    
+    if check_password_hash(user.password, auth.password):
+        token = jwt.encode({'public_id' : user.public_id, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
+
+        return jsonify({'token' : token.decode('UTF-8')})
+    
+    return make_response('Could not verify', 401, {'WWW-Authenticate' : 'Basic realm="Login required!"'})
+    
 if __name__ == '__main__':
     app.run(debug=True)
